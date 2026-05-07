@@ -3,6 +3,8 @@
 
 #include "cl_parser.h"
 
+namespace tps::cl_parser {
+
 ProgramConfig ParseCl(int argc, const char* argv[]) {
     if (argc != 3) {
         throw std::runtime_error("Usage: " + std::string{argv[0]} + " N M");
@@ -23,3 +25,5 @@ ProgramConfig ParseCl(int argc, const char* argv[]) {
 
     return config;
 }
+
+} // namespace tps::cl_parser
