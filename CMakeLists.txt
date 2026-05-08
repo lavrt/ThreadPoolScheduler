@@ -14,4 +14,7 @@ target_include_directories(pool
         src/cl_parser
         src/task_generator
         src/task
+        src/task_queue
+        src/thread_pool
+        src/logging
 )
