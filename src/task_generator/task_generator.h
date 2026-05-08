@@ -18,11 +18,17 @@ public:
         tasks.reserve(task_count);
 
         for (std::size_t i = 0, ie = task_count; i != ie; ++i) {
+            auto payload = GetRandomInt();
+            auto delay = GetRandomInt();
+
             task::Task task {
                 .name = "task_" + std::to_string(i + 1),
-                .payload = GetRandomInt(),
-                .delay = GetRandomInt()
+                .payload = payload,
+                .delay = delay,
+                .ready_at = std::chrono::steady_clock::now()
+                          + std::chrono::seconds(delay)
             };
+
             tasks.push_back(task);
         }
 
