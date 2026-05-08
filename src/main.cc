@@ -1,23 +1,27 @@
 #include <iostream>
+#include <algorithm>
 
 #include "cl_parser.h"
 #include "task_generator.h"
 #include "thread_pool.h"
 #include "logger.h"
 
+using namespace tps;
+
 int main(int argc, const char* argv[]) {
     try {
-        auto config = tps::cl_parser::ParseCl(argc, argv);
+        auto cfg = cl_parser::ParseCl(argc, argv);
 
-        tps::logging::AsyncLogger logger;
+        logging::AsyncLogger logger(std::cout);
 
-        auto tasks = tps::task_generator::TaskGenerator{}.Generate(config.task_count);
-        logger.Post(tps::logging::TasksGenerated{config.task_count});
-        for (auto&& task : tasks) {
-            logger.Post(tps::logging::TaskInfo{task.name, task.payload, task.delay});
-        }
+        auto tasks = task_generator::TaskGenerator{}.Generate(cfg.task_count);
+        logger.Post(logging::TasksGenerated{cfg.task_count});
 
-        tps::thread_pool::ThreadPool pool(config.thread_count);
+        std::for_each(tasks.begin(), tasks.end(), [&logger](auto&& task) {
+            logger.Post(logging::TaskInfo{task.name, task.payload, task.delay});
+        });
+
+        thread_pool::ThreadPool pool(cfg.thread_count, logger);
         for (auto&& task : tasks) {
             pool.Submit(task);
         }
