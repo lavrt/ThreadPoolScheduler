@@ -13,9 +13,17 @@ namespace tps::task_queue {
 
 class TaskQueue {
 public:
+    TaskQueue() = default;
+
+    ~TaskQueue() = default;
+
     TaskQueue(const TaskQueue&) = delete;
 
     TaskQueue& operator=(const TaskQueue&) = delete;
+
+    TaskQueue(TaskQueue&&) = delete;
+
+    TaskQueue& operator=(TaskQueue&&) = delete;
 
     void Push(task::Task task) {
         {
