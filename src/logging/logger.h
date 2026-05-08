@@ -1,6 +1,6 @@
 #pragma once
 
-#include <iostream>
+#include <ostream>
 #include <thread>
 #include <queue>
 #include <mutex>
@@ -13,14 +13,10 @@
 
 namespace tps::logging {
 
-using Event = std::variant<
-    TasksGenerated,
-    TaskInfo
->;
-
 class AsyncLogger {
 public:
-    AsyncLogger() : log_thread_(&AsyncLogger::ProcessLogs, this) {}
+    AsyncLogger(std::ostream& os)
+        : os_(os), log_thread_(&AsyncLogger::ProcessLogs, this) {}
 
     ~AsyncLogger() {
         {
@@ -45,6 +41,8 @@ public:
     }
 
 private:
+    std::ostream& os_;
+
     std::thread log_thread_;
     std::queue<Event> events_;
 
@@ -68,8 +66,8 @@ private:
             events_.pop();
 
             lock.unlock();
-            std::visit([](auto&& ev) {
-                std::cout << ev;
+            std::visit([this](auto&& ev) {
+                os_ << ev;
             }, event);
             lock.lock();
         }

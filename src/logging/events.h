@@ -12,4 +12,14 @@ struct TaskInfo {
     int task_delay{};
 };
 
+struct ThreadsStarted {
+    int thread_count{};
+};
+
+using Event = std::variant<
+    TasksGenerated,
+    TaskInfo,
+    ThreadsStarted
+>;
+
 } // namespace tps::logging
