@@ -6,17 +6,21 @@
 #include <thread>
 
 #include "task_queue.h"
+#include "logger.h"
 
 namespace tps::thread_pool {
 
 class ThreadPool {
 public:
-    ThreadPool(int thread_count) : thread_count_(thread_count) {
+    ThreadPool(int thread_count, logging::AsyncLogger& logger)
+        : thread_count_(thread_count), logger_(logger) {
         workers_.reserve(thread_count_);
 
         for (std::size_t i = 0, ie = thread_count_; i != ie; ++i) {
             workers_.emplace_back(&ThreadPool::WorkerLoop, this);
         }
+
+        logger.Post(logging::ThreadsStarted{thread_count_});
     }
 
     ~ThreadPool() {
@@ -67,6 +71,7 @@ private:
     int thread_count_;
     std::vector<std::thread> workers_;
     task_queue::TaskQueue tasks_;
+    logging::AsyncLogger& logger_;
 };
 
 } // namespace tps::thread_pool
