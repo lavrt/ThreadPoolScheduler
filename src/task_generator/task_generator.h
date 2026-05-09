@@ -29,7 +29,7 @@ public:
                           + std::chrono::seconds(delay)
             };
 
-            tasks.push_back(task);
+            tasks.push_back(std::move(task));
         }
 
         return tasks;
