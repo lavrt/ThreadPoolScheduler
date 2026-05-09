@@ -1,5 +1,6 @@
 #pragma once
 
+#include <variant>
 #include <string>
 #include <chrono>
 
@@ -31,12 +32,23 @@ struct TaskFinished {
     std::chrono::system_clock::time_point timestamp;
 };
 
+struct AllTasksFinished {};
+
+struct JoiningWorkers {};
+
+struct WorkerJoined {
+    int worker_id{};
+};
+
 using Event = std::variant<
     TasksGenerated,
     TaskInfo,
     ThreadsStarted,
     TaskStarted,
-    TaskFinished
+    TaskFinished,
+    AllTasksFinished,
+    JoiningWorkers,
+    WorkerJoined
 >;
 
 } // namespace tps::logging

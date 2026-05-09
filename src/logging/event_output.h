@@ -4,6 +4,8 @@
 #include <chrono>
 #include <sstream>
 #include <iomanip>
+#include <string>
+#include <ctime>
 
 #include "events.h"
 
@@ -50,5 +52,23 @@ inline std::ostream& operator<<(std::ostream& os,
     os << "[Worker " << event.worker_id << "] "
        << event.task_name << ", "
        << "finished at: " << FormatTime(event.timestamp) << "\n";
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const tps::logging::AllTasksFinished& event) {
+    os << "All tasks finished\n";
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const tps::logging::JoiningWorkers& event) {
+    os << "Joining workers\n";
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const tps::logging::WorkerJoined& event) {
+    os << "Worker " << event.worker_id << " is joined\n";
     return os;
 }
