@@ -4,6 +4,7 @@
 #include <vector>
 #include <utility>
 #include <thread>
+#include <atomic>
 
 #include "task_queue.h"
 #include "logger.h"
@@ -17,7 +18,7 @@ public:
         workers_.reserve(thread_count_);
 
         for (std::size_t i = 0, ie = thread_count_; i != ie; ++i) {
-            workers_.emplace_back(&ThreadPool::WorkerLoop, this);
+            workers_.emplace_back(&ThreadPool::WorkerLoop, this, i + 1);
         }
 
         logger.Post(logging::ThreadsStarted{thread_count_});
@@ -52,7 +53,7 @@ public:
         tasks_.Stop();
     }
 
-    void WorkerLoop() {
+    void WorkerLoop(int worker_id) {
         for (;;) {
             auto task_opt = tasks_.WaitAndPop();
             if (!task_opt.has_value()) {
@@ -61,9 +62,17 @@ public:
 
             auto task = std::move(task_opt.value());
 
+            logger_.Post(logging::TaskStarted{
+                worker_id,
+                task.name,
+                std::chrono::system_clock::now()});
+
             std::this_thread::sleep_for(std::chrono::seconds(task.payload));
 
-
+            logger_.Post(logging::TaskFinished{
+                worker_id,
+                task.name,
+                std::chrono::system_clock::now()});
         }
     }
 
