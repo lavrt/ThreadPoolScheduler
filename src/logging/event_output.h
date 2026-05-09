@@ -1,74 +1,18 @@
 #pragma once
 
 #include <ostream>
-#include <chrono>
-#include <sstream>
-#include <iomanip>
-#include <string>
-#include <ctime>
 
 #include "events.h"
 
-inline std::string FormatTime(std::chrono::system_clock::time_point time) {
-    auto t = std::chrono::system_clock::to_time_t(time);
-    auto tm = *std::localtime(&t);
+namespace tps::logging {
 
-    std::ostringstream oss;
-    oss << std::put_time(&tm, "%H:%M:%S");
+std::ostream& operator<<(std::ostream& os, const TasksGenerated& event);
+std::ostream& operator<<(std::ostream& os, const TaskInfo& event);
+std::ostream& operator<<(std::ostream& os, const ThreadsStarted& event);
+std::ostream& operator<<(std::ostream& os, const TaskStarted& event);
+std::ostream& operator<<(std::ostream& os, const TaskFinished& event);
+std::ostream& operator<<(std::ostream& os, const AllTasksFinished& event);
+std::ostream& operator<<(std::ostream& os, const JoiningWorkers& event);
+std::ostream& operator<<(std::ostream& os, const WorkerJoined& event);
 
-    return oss.str();
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const tps::logging::TasksGenerated& event) {
-    os << event.task_count << " tasks generated\n";
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const tps::logging::TaskInfo& event) {
-    os << event.task_name << " "
-       << event.task_payload << " "
-       << event.task_delay << "\n";
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const tps::logging::ThreadsStarted& event) {
-    os << event.thread_count << " worker threads started\n";
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const tps::logging::TaskStarted& event) {
-    os << "[Worker " << event.worker_id << "] "
-       << event.task_name << ", "
-       << "started at: " << FormatTime(event.timestamp) << "\n";
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const tps::logging::TaskFinished& event) {
-    os << "[Worker " << event.worker_id << "] "
-       << event.task_name << ", "
-       << "finished at: " << FormatTime(event.timestamp) << "\n";
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const tps::logging::AllTasksFinished& event) {
-    os << "All tasks finished\n";
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const tps::logging::JoiningWorkers& event) {
-    os << "Joining workers\n";
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const tps::logging::WorkerJoined& event) {
-    os << "Worker " << event.worker_id << " is joined\n";
-    return os;
-}
+} // namespace tps::logging

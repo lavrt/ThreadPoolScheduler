@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(pool
     src/main.cc
     src/cl_parser/cl_parser.cc
+    src/logging/event_output.cc
 )
 
 target_include_directories(pool
