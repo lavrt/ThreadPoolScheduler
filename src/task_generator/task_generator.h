@@ -2,6 +2,9 @@
 
 #include <vector>
 #include <random>
+#include <chrono>
+#include <string>
+#include <cstddef>
 
 #include "task.h"
 
@@ -22,12 +25,10 @@ public:
             auto delay = GetRandomInt();
 
             task::Task task {
-                .name = "task_" + std::to_string(i + 1),
-                .payload = payload,
-                .delay = delay,
-                .ready_at = std::chrono::steady_clock::now()
-                          + std::chrono::seconds(delay)
-            };
+                "task_" + std::to_string(i + 1),
+                payload,
+                delay,
+                std::chrono::steady_clock::now() + std::chrono::seconds(delay)};
 
             tasks.push_back(std::move(task));
         }
