@@ -68,6 +68,19 @@ public:
         }
     }
 
+private:
+    int thread_count_;
+    std::vector<std::thread> workers_;
+    task_queue::TaskQueue tasks_;
+
+    std::atomic_bool is_shutdown_{false};
+
+    int exited_workers_{};
+    std::mutex exit_mutex_;
+    std::condition_variable exit_cv_;
+
+    logging::AsyncLogger& logger_;
+
     void WorkerLoop(int worker_id) {
         while (auto task_opt = tasks_.WaitAndPop()) {
             auto task = std::move(task_opt.value());
@@ -91,19 +104,6 @@ public:
         }
         exit_cv_.notify_all();
     }
-
-private:
-    int thread_count_;
-    std::vector<std::thread> workers_;
-    task_queue::TaskQueue tasks_;
-
-    std::atomic_bool is_shutdown_{false};
-
-    int exited_workers_{};
-    std::mutex exit_mutex_;
-    std::condition_variable exit_cv_;
-
-    logging::AsyncLogger& logger_;
 };
 
 } // namespace tps::thread_pool
