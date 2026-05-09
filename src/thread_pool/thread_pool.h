@@ -3,8 +3,10 @@
 #include <thread>
 #include <vector>
 #include <utility>
-#include <thread>
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <chrono>
 
 #include "task_queue.h"
 #include "logger.h"
@@ -17,7 +19,7 @@ public:
         : thread_count_(thread_count), logger_(logger) {
         workers_.reserve(thread_count_);
 
-        for (std::size_t i = 0, ie = thread_count_; i != ie; ++i) {
+        for (int i = 0, ie = thread_count_; i != ie; ++i) {
             workers_.emplace_back(&ThreadPool::WorkerLoop, this, i + 1);
         }
 
@@ -25,8 +27,7 @@ public:
     }
 
     ~ThreadPool() {
-        Stop();
-        Join();
+        Shutdown();
     }
 
     ThreadPool(const ThreadPool&) = delete;
@@ -41,25 +42,34 @@ public:
         tasks_.Push(std::move(task));
     }
 
-    void Join() {
-        for (auto&& worker : workers_) {
-            if (worker.joinable()) {
-                worker.join();
+    void Shutdown() {
+        if (is_shutdown_.exchange(true)) {
+            return;
+        }
+
+        tasks_.Stop();
+
+        {
+            std::unique_lock<std::mutex> lock(exit_mutex_);
+            exit_cv_.wait(lock, [this] {
+                return exited_workers_ == thread_count_;
+            });
+        }
+
+        logger_.Post(logging::AllTasksFinished{});
+
+        logger_.Post(logging::JoiningWorkers{});
+
+        for (int i = 0; i != workers_.size(); ++i) {
+            if (workers_[i].joinable()) {
+                workers_[i].join();
+                logger_.Post(logging::WorkerJoined{i + 1});
             }
         }
     }
 
-    void Stop() {
-        tasks_.Stop();
-    }
-
     void WorkerLoop(int worker_id) {
-        for (;;) {
-            auto task_opt = tasks_.WaitAndPop();
-            if (!task_opt.has_value()) {
-                return;
-            }
-
+        while (auto task_opt = tasks_.WaitAndPop()) {
             auto task = std::move(task_opt.value());
 
             logger_.Post(logging::TaskStarted{
@@ -74,12 +84,25 @@ public:
                 task.name,
                 std::chrono::system_clock::now()});
         }
+
+        {
+            std::lock_guard<std::mutex> lock(exit_mutex_);
+            ++exited_workers_;
+        }
+        exit_cv_.notify_all();
     }
 
 private:
     int thread_count_;
     std::vector<std::thread> workers_;
     task_queue::TaskQueue tasks_;
+
+    std::atomic_bool is_shutdown_{false};
+
+    int exited_workers_{};
+    std::mutex exit_mutex_;
+    std::condition_variable exit_cv_;
+
     logging::AsyncLogger& logger_;
 };
 
