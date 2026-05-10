@@ -1,5 +1,6 @@
 #include <iostream>
-#include <algorithm>
+#include <thread>
+#include <chrono>
 
 #include "cl_parser.h"
 #include "task_generator.h"
@@ -23,7 +24,20 @@ int main(int argc, const char* argv[]) {
 
         thread_pool::ThreadPool pool(cfg.thread_count, logger);
         for (auto&& task : tasks) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
             pool.Submit(task);
+        }
+
+        pool.Shutdown();
+
+        logger.Post(logging::StatisticsHeader{});
+        const auto& stats = pool.GetStats();
+        for (std::size_t i = 0, ie = stats.size(); i != ie; ++i) {
+            logger.Post(logging::WorkerStatistics{
+                static_cast<int>(i + 1),
+                stats[i].tasks_done,
+                stats[i].total_payload
+            });
         }
 
     } catch (const std::exception& e) {
