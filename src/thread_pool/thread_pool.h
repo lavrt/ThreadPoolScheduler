@@ -7,18 +7,12 @@
 #include <mutex>
 #include <condition_variable>
 #include <chrono>
-#include <algorithm>
-#include <new>
 
 #include "task_queue.h"
 #include "logger.h"
+#include "stats.h"
 
 namespace tps::thread_pool {
-
-struct alignas(std::hardware_destructive_interference_size) WorkerStats {
-    int tasks_done{};
-    int total_payload{};
-};
 
 class ThreadPool {
 public:
@@ -35,12 +29,7 @@ public:
 
             SafePost(logging::ThreadsStarted{thread_count_});
         } catch (...) {
-            tasks_.Stop();
-            for (auto&& worker : workers_) {
-                if (worker.joinable()) {
-                    worker.join();
-                }
-            }
+            Shutdown();
             throw;
         }
     }
@@ -57,31 +46,39 @@ public:
 
     ThreadPool& operator=(ThreadPool&&) = delete;
 
-    void Submit(task::Task task) {
-        tasks_.Push(std::move(task));
-    }
-
-    void Shutdown() {
-        if (is_shutdown_.exchange(true)) {
-            return;
-        }
-
-        tasks_.Stop();
-
+    bool Submit(task::Task task) {
         {
-            std::unique_lock<std::mutex> lock(exit_mutex_);
-            exit_cv_.wait(lock, [this] {
-                return exited_workers_ == workers_.size();
-            });
+            std::lock_guard<std::mutex> lock(wait_mutex);
+            ++unfinished_tasks_;
         }
 
-        SafePost(logging::AllTasksFinished{});
+        if (!tasks_.Push(std::move(task))) {
+            {
+                std::lock_guard<std::mutex> lock(wait_mutex);
+                --unfinished_tasks_;
+            }
+            wait_cv_.notify_all();
+            return false;
+        }
 
-        Join();
+        return true;
     }
 
-    const std::vector<WorkerStats>& GetStats() const noexcept {
+    // GetStats() is valid only after Shutdown()
+    const stats::StatsCollector& GetStats() const noexcept {
         return stats_;
+    }
+
+    void Wait() {
+        std::unique_lock<std::mutex> lock(wait_mutex);
+        wait_cv_.wait(lock, [this] {
+            return unfinished_tasks_ == 0;
+        });
+    }
+    
+    void Shutdown() {
+        tasks_.Stop();
+        JoinWorkers();
     }
 
 private:
@@ -89,28 +86,19 @@ private:
     std::vector<std::thread> workers_;
     task_queue::TaskQueue<task::Task> tasks_;
 
-    std::vector<WorkerStats> stats_;
+    stats::StatsCollector stats_;
 
-    std::atomic_bool is_shutdown_{false};
-
-    int exited_workers_{};
-    std::mutex exit_mutex_;
-    std::condition_variable exit_cv_;
+    std::size_t unfinished_tasks_{};
+    std::condition_variable wait_cv_;
+    std::mutex wait_mutex;
 
     logging::AsyncLogger& logger_;
 
-    void Join() {
-        if (std::none_of(workers_.begin(), workers_.end(), [](auto&& w) {
-                return w.joinable();
-            })
-        ) return;
-
-        SafePost(logging::JoiningWorkers{});
-
-        for (int i = 0; i != workers_.size(); ++i) {
+    void JoinWorkers() {
+        for (std::size_t i = 0, ie = workers_.size(); i != ie; ++i) {
             if (workers_[i].joinable()) {
                 workers_[i].join();
-                SafePost(logging::WorkerJoined{i + 1});
+                SafePost(logging::WorkerJoined{static_cast<int>(i + 1)});
             }
         }
     }
@@ -125,24 +113,27 @@ private:
                 std::chrono::system_clock::now()
             });
 
-            task();
+            try {
+                task();
 
-            SafePost(logging::TaskFinished{
-                worker_id,
-                task.name,
-                std::chrono::system_clock::now()
-            });
+                SafePost(logging::TaskFinished{
+                    worker_id,
+                    task.name,
+                    std::chrono::system_clock::now()
+                });
 
-            stats_[static_cast<std::size_t>(worker_id - 1)].tasks_done++;
-            stats_[static_cast<std::size_t>(worker_id - 1)].total_payload
-                += task.payload;
+                stats_.TaskDone(worker_id - 1);
+                stats_.AddPayload(worker_id - 1, task.payload);
+            } catch (...) {
+                // suppress exceptions
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(wait_mutex);
+                --unfinished_tasks_;
+            }
+            wait_cv_.notify_all();
         }
-
-        {
-            std::lock_guard<std::mutex> lock(exit_mutex_);
-            ++exited_workers_;
-        }
-        exit_cv_.notify_all();
     }
 
     template <typename Event>
