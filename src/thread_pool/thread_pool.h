@@ -87,7 +87,7 @@ public:
 private:
     int thread_count_;
     std::vector<std::thread> workers_;
-    task_queue::TaskQueue tasks_;
+    task_queue::TaskQueue<task::Task> tasks_;
 
     std::vector<WorkerStats> stats_;
 
@@ -122,20 +122,22 @@ private:
             SafePost(logging::TaskStarted{
                 worker_id,
                 task.name,
-                std::chrono::system_clock::now()});
+                std::chrono::system_clock::now()
+            });
 
-            std::this_thread::sleep_for(std::chrono::seconds(task.payload));
-
-            stats_[static_cast<std::size_t>(worker_id - 1)].tasks_done++;
-            stats_[static_cast<std::size_t>(worker_id - 1)].total_payload
-                += task.payload;
+            task();
 
             SafePost(logging::TaskFinished{
                 worker_id,
                 task.name,
-                std::chrono::system_clock::now()});
+                std::chrono::system_clock::now()
+            });
+
+            stats_[static_cast<std::size_t>(worker_id - 1)].tasks_done++;
+            stats_[static_cast<std::size_t>(worker_id - 1)].total_payload
+                += task.payload;
         }
-        
+
         {
             std::lock_guard<std::mutex> lock(exit_mutex_);
             ++exited_workers_;

@@ -11,6 +11,7 @@
 
 namespace tps::task_queue {
 
+template <typename T>
 class TaskQueue {
 public:
     TaskQueue() = default;
@@ -25,21 +26,22 @@ public:
 
     TaskQueue& operator=(TaskQueue&&) = delete;
 
-    void Push(task::Task task) {
+    bool Push(T&& task) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
             
             if (stopped_) {
-                return;
+                return false;
             }
 
-            tasks_.push(std::move(task));
+            tasks_.push(std::forward<T>(task));
         }
 
         condition_.notify_one();
+        return true;
     }
 
-    std::optional<task::Task> WaitAndPop() {
+    std::optional<T> WaitAndPop() {
         std::unique_lock<std::mutex> lock(mutex_);
 
         for (;;) {
@@ -78,16 +80,12 @@ public:
 
 private:
     struct CompareByReadyAt {
-        bool operator()(const task::Task& lhs, const task::Task& rhs) const {
+        bool operator()(const T& lhs, const T& rhs) const {
             return lhs.ready_at > rhs.ready_at;
         }
     };
 
-    std::priority_queue<
-        task::Task,
-        std::vector<task::Task>,
-        CompareByReadyAt
-    > tasks_;
+    std::priority_queue<T, std::vector<T>, CompareByReadyAt> tasks_;
 
     std::mutex mutex_;
     std::condition_variable condition_;
