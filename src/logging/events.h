@@ -40,6 +40,14 @@ struct WorkerJoined {
     int worker_id{};
 };
 
+struct StatisticsHeader {};
+
+struct WorkerStatistics {
+    int worker_id{};
+    int tasks_done{};
+    int total_payload{};
+};
+
 using Event = std::variant<
     TasksGenerated,
     TaskInfo,
@@ -48,7 +56,9 @@ using Event = std::variant<
     TaskFinished,
     AllTasksFinished,
     JoiningWorkers,
-    WorkerJoined
+    WorkerJoined,
+    StatisticsHeader,
+    WorkerStatistics
 >;
 
 } // namespace tps::logging

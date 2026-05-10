@@ -23,7 +23,7 @@ std::string FormatTime(std::chrono::system_clock::time_point time) {
 } // namespace
 
 std::ostream& operator<<(std::ostream& os, const TasksGenerated& event) {
-    os << event.task_count << " tasks generated\n";
+    os << event.task_count << " tasks generated:\n";
     return os;
 }
 
@@ -42,29 +42,41 @@ std::ostream& operator<<(std::ostream& os, const ThreadsStarted& event) {
 std::ostream& operator<<(std::ostream& os, const TaskStarted& event) {
     os << "[Worker " << event.worker_id << "] "
        << event.task_name << ", "
-       << "started at: " << FormatTime(event.timestamp) << "\n";
+       << "started_at: " << FormatTime(event.timestamp) << "\n";
     return os;
 }
 
 std::ostream& operator<<(std::ostream& os, const TaskFinished& event) {
     os << "[Worker " << event.worker_id << "] "
        << event.task_name << ", "
-       << "finished at: " << FormatTime(event.timestamp) << "\n";
+       << "finished_at: " << FormatTime(event.timestamp) << "\n";
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const AllTasksFinished& event) {
-    os << "All tasks finished\n";
+std::ostream& operator<<(std::ostream& os, const AllTasksFinished&) {
+    os << "All tasks are finished\n";
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const JoiningWorkers& event) {
+std::ostream& operator<<(std::ostream& os, const JoiningWorkers&) {
     os << "Joining workers\n";
     return os;
 }
 
 std::ostream& operator<<(std::ostream& os, const WorkerJoined& event) {
     os << "Worker " << event.worker_id << " is joined\n";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const StatisticsHeader&) {
+    os << "Statistics:\n";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const WorkerStatistics& event) {
+    os << "Worker " << event.worker_id << ": "
+       << "made " << event.tasks_done << " tasks, "
+       << "total payload: " << event.total_payload << " sec\n";
     return os;
 }
 
