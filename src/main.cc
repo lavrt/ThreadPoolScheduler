@@ -24,7 +24,6 @@ int main(int argc, const char* argv[]) {
 
         thread_pool::ThreadPool pool(cfg.thread_count, logger);
         for (auto&& task : tasks) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
             pool.Submit(task);
         }
 
