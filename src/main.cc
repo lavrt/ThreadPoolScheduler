@@ -15,23 +15,25 @@ int main(int argc, const char* argv[]) {
 
         logging::AsyncLogger logger(std::cout);
 
+        thread_pool::ThreadPool pool(cfg.thread_count, logger);
+
         auto tasks = task_generator::TaskGenerator{}.Generate(cfg.task_count);
-        
         logger.Post(logging::TasksGenerated{cfg.task_count});
+
         for (auto&& task : tasks) {
             logger.Post(logging::TaskInfo{task.name, task.payload, task.delay});
+            pool.Submit(std::move(task));
         }
 
-        thread_pool::ThreadPool pool(cfg.thread_count, logger);
-        for (auto&& task : tasks) {
-            pool.Submit(task);
-        }
+        pool.Wait();
+        logger.Post(logging::AllTasksFinished{});
 
+        logger.Post(logging::JoiningWorkers{});
         pool.Shutdown();
 
         logger.Post(logging::StatisticsHeader{});
         const auto& stats = pool.GetStats();
-        for (std::size_t i = 0, ie = stats.size(); i != ie; ++i) {
+        for (std::size_t i = 0, ie = stats.Size(); i != ie; ++i) {
             logger.Post(logging::WorkerStatistics{
                 static_cast<int>(i + 1),
                 stats[i].tasks_done,
