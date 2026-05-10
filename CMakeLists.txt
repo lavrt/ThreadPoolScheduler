@@ -19,3 +19,5 @@ target_include_directories(pool
         src/thread_pool
         src/logging
 )
+
+target_compile_options(pool PRIVATE -Wno-interference-size)

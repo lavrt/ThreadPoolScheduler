@@ -7,23 +7,42 @@
 #include <mutex>
 #include <condition_variable>
 #include <chrono>
+#include <algorithm>
+#include <new>
 
 #include "task_queue.h"
 #include "logger.h"
 
 namespace tps::thread_pool {
 
+struct alignas(std::hardware_destructive_interference_size) WorkerStats {
+    int tasks_done{};
+    int total_payload{};
+};
+
 class ThreadPool {
 public:
     ThreadPool(int thread_count, logging::AsyncLogger& logger)
-        : thread_count_(thread_count), logger_(logger) {
-        workers_.reserve(thread_count_);
+        : thread_count_(thread_count),
+          stats_(static_cast<std::size_t>(thread_count)),
+          logger_(logger) {
+        try {
+            workers_.reserve(thread_count_);
+        
+            for (int id = 1; id <= thread_count_; ++id) {
+                workers_.emplace_back(&ThreadPool::WorkerLoop, this, id);
+            }
 
-        for (int i = 0, ie = thread_count_; i != ie; ++i) {
-            workers_.emplace_back(&ThreadPool::WorkerLoop, this, i + 1);
+            SafePost(logging::ThreadsStarted{thread_count_});
+        } catch (...) {
+            tasks_.Stop();
+            for (auto&& worker : workers_) {
+                if (worker.joinable()) {
+                    worker.join();
+                }
+            }
+            throw;
         }
-
-        logger.Post(logging::ThreadsStarted{thread_count_});
     }
 
     ~ThreadPool() {
@@ -52,26 +71,25 @@ public:
         {
             std::unique_lock<std::mutex> lock(exit_mutex_);
             exit_cv_.wait(lock, [this] {
-                return exited_workers_ == thread_count_;
+                return exited_workers_ == workers_.size();
             });
         }
 
-        logger_.Post(logging::AllTasksFinished{});
+        SafePost(logging::AllTasksFinished{});
 
-        logger_.Post(logging::JoiningWorkers{});
+        Join();
+    }
 
-        for (int i = 0; i != workers_.size(); ++i) {
-            if (workers_[i].joinable()) {
-                workers_[i].join();
-                logger_.Post(logging::WorkerJoined{i + 1});
-            }
-        }
+    const std::vector<WorkerStats>& GetStats() const noexcept {
+        return stats_;
     }
 
 private:
     int thread_count_;
     std::vector<std::thread> workers_;
     task_queue::TaskQueue tasks_;
+
+    std::vector<WorkerStats> stats_;
 
     std::atomic_bool is_shutdown_{false};
 
@@ -81,28 +99,57 @@ private:
 
     logging::AsyncLogger& logger_;
 
+    void Join() {
+        if (std::none_of(workers_.begin(), workers_.end(), [](auto&& w) {
+                return w.joinable();
+            })
+        ) return;
+
+        SafePost(logging::JoiningWorkers{});
+
+        for (int i = 0; i != workers_.size(); ++i) {
+            if (workers_[i].joinable()) {
+                workers_[i].join();
+                SafePost(logging::WorkerJoined{i + 1});
+            }
+        }
+    }
+
     void WorkerLoop(int worker_id) {
         while (auto task_opt = tasks_.WaitAndPop()) {
             auto task = std::move(task_opt.value());
 
-            logger_.Post(logging::TaskStarted{
+            SafePost(logging::TaskStarted{
                 worker_id,
                 task.name,
                 std::chrono::system_clock::now()});
 
             std::this_thread::sleep_for(std::chrono::seconds(task.payload));
 
-            logger_.Post(logging::TaskFinished{
+            stats_[static_cast<std::size_t>(worker_id - 1)].tasks_done++;
+            stats_[static_cast<std::size_t>(worker_id - 1)].total_payload
+                += task.payload;
+
+            SafePost(logging::TaskFinished{
                 worker_id,
                 task.name,
                 std::chrono::system_clock::now()});
         }
-
+        
         {
             std::lock_guard<std::mutex> lock(exit_mutex_);
             ++exited_workers_;
         }
         exit_cv_.notify_all();
+    }
+
+    template <typename Event>
+    void SafePost(Event&& event) noexcept {
+        try {
+            logger_.Post(std::forward<Event>(event));
+        } catch (...) {
+            // suppress exceptions
+        }
     }
 };
 
