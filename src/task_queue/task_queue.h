@@ -11,7 +11,8 @@
 
 namespace tps::task_queue {
 
-template <typename T>
+template <typename T,
+          typename = std::void_t<decltype(std::declval<T>().ready_at)>>
 class TaskQueue {
 public:
     TaskQueue() = default;
