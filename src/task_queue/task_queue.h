@@ -7,90 +7,88 @@
 #include <chrono>
 #include <optional>
 
-#include "task.h"
-
 namespace tps::task_queue {
 
-template <typename T,
-          typename = std::void_t<decltype(std::declval<T>().ready_at)>>
-class TaskQueue {
+template <typename T>
+class ThreadSafeQueue {
 public:
-    TaskQueue() = default;
+    ThreadSafeQueue() = default;
 
-    ~TaskQueue() = default;
+    ~ThreadSafeQueue() = default;
 
-    TaskQueue(const TaskQueue&) = delete;
+    ThreadSafeQueue(const ThreadSafeQueue&) = delete;
 
-    TaskQueue& operator=(const TaskQueue&) = delete;
+    ThreadSafeQueue& operator=(const ThreadSafeQueue&) = delete;
 
-    TaskQueue(TaskQueue&&) = delete;
+    ThreadSafeQueue(ThreadSafeQueue&&) = delete;
 
-    TaskQueue& operator=(TaskQueue&&) = delete;
+    ThreadSafeQueue& operator=(ThreadSafeQueue&&) = delete;
 
-    bool Push(T&& task) {
+    void Push(T value) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            
-            if (stopped_) {
-                return false;
+            if (closed_) {
+                return;
             }
-
-            tasks_.push(std::forward<T>(task));
+            queue_.push(std::move(value));
         }
-
-        condition_.notify_one();
-        return true;
+        cv_.notify_one();
     }
 
-    std::optional<T> WaitAndPop() {
+    std::optional<T> WaitPop() {
         std::unique_lock<std::mutex> lock(mutex_);
 
-        for (;;) {
-            if (tasks_.empty()) {
-                if (stopped_) {
-                    return std::nullopt;
-                }
+        cv_.wait(lock, [this] {
+            return !queue_.empty() || closed_;
+        });
 
-                condition_.wait(lock, [this]{
-                    return stopped_ || !tasks_.empty();
-                });
-
-                continue;
-            }
-
-            const auto ready_at = tasks_.top().ready_at;
-
-            if (ready_at <= std::chrono::steady_clock::now()) {
-                auto task = tasks_.top();
-                tasks_.pop();
-                return task;
-            }
-
-            condition_.wait_until(lock, ready_at);
+        if (queue_.empty() && closed_) {
+            return std::nullopt;
         }
+
+        T value = std::move(queue_.front());
+        queue_.pop();
+
+        return value;
     }
 
-    void Stop() {
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            stopped_ = true;
+    std::optional<T> TryPop() {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (queue_.empty()) {
+            return std::nullopt;
         }
 
-        condition_.notify_all();
+        T value = std::move(queue_.front());
+        queue_.pop();
+
+        return value;
+    }
+
+    void Close() {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            closed_ = true;
+        }
+        cv_.notify_all();
+    }
+
+    bool Empty() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return queue_.empty();
+    }
+
+    std::size_t Size() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return queue_.size();
     }
 
 private:
-    struct CompareByReadyAt {
-        bool operator()(const T& lhs, const T& rhs) const {
-            return lhs.ready_at > rhs.ready_at;
-        }
-    };
+    std::queue<T> queue_;
 
-    std::priority_queue<T, std::vector<T>, CompareByReadyAt> tasks_;
-
-    std::mutex mutex_;
-    std::condition_variable condition_;
-    bool stopped_{false};
+    mutable std::mutex mutex_;
+    std::condition_variable cv_;
+    bool closed_{false};
 };
 
 } // namespace tps::task_queue

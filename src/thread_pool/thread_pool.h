@@ -7,6 +7,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <chrono>
+#include <functional>
 
 #include "task_queue.h"
 #include "logger.h"
@@ -14,28 +15,39 @@
 
 namespace tps::thread_pool {
 
-class ThreadPool {
-public:
-    ThreadPool(int thread_count, logging::AsyncLogger& logger)
-        : thread_count_(thread_count),
-          stats_(static_cast<std::size_t>(thread_count)),
-          logger_(logger) {
-        try {
-            workers_.reserve(thread_count_);
-        
-            for (int id = 1; id <= thread_count_; ++id) {
-                workers_.emplace_back(&ThreadPool::WorkerLoop, this, id);
-            }
+struct /* alignas(std::hardware_destructive_interference_size) */ WorkerContext {
+    int id{};
+    int tasks_done{};
+    int total_payload{};
+};
 
-            SafePost(logging::ThreadsStarted{thread_count_});
-        } catch (...) {
-            Shutdown();
-            throw;
+class ThreadPool {
+
+public:
+    static inline thread_local int worker_id;
+    static inline thread_local WorkerContext worker_context;
+
+    ThreadPool(int thread_count) : thread_count_(thread_count), stats_(thread_count) {
+        for (int i = 0, ie = thread_count_; i != ie; ++i) {
+            threads_.emplace_back([this, i] {
+                worker_id = i + 1;
+                while (auto task_opt = tasks_.WaitPop()) {
+                    std::invoke(std::move(task_opt.value()));
+                    NotifyTaskFinished();
+                    stats_[i] = worker_context;
+                }
+            });
         }
     }
 
     ~ThreadPool() {
-        Shutdown();
+        tasks_.Close();
+
+        for (auto&& thread : threads_) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
     }
 
     ThreadPool(const ThreadPool&) = delete;
@@ -46,102 +58,41 @@ public:
 
     ThreadPool& operator=(ThreadPool&&) = delete;
 
-    bool Submit(task::Task task) {
+    template <typename Function>
+    void Enqueue(Function&& f) {
         {
-            std::lock_guard<std::mutex> lock(wait_mutex);
-            ++unfinished_tasks_;
+            std::lock_guard<std::mutex> lock(wait_mutex_);
+            ++active_tasks_;
         }
-
-        if (!tasks_.Push(std::move(task))) {
-            {
-                std::lock_guard<std::mutex> lock(wait_mutex);
-                --unfinished_tasks_;
-            }
-            wait_cv_.notify_all();
-            return false;
-        }
-
-        return true;
-    }
-
-    // GetStats() is valid only after Shutdown()
-    const stats::StatsCollector& GetStats() const noexcept {
-        return stats_;
+        tasks_.Push(std::forward<Function>(f));
     }
 
     void Wait() {
-        std::unique_lock<std::mutex> lock(wait_mutex);
+        std::unique_lock<std::mutex> lock(wait_mutex_);
         wait_cv_.wait(lock, [this] {
-            return unfinished_tasks_ == 0;
+            return active_tasks_ == 0;
         });
     }
-    
-    void Shutdown() {
-        tasks_.Stop();
-        JoinWorkers();
+
+    const std::vector<WorkerContext>& GetStats() const {
+        return stats_;
     }
 
 private:
     int thread_count_;
-    std::vector<std::thread> workers_;
-    task_queue::TaskQueue<task::Task> tasks_;
+    std::vector<std::thread> threads_;
+    task_queue::ThreadSafeQueue<std::function<void()>> tasks_;
 
-    stats::StatsCollector stats_;
+    std::vector<WorkerContext> stats_;
 
-    std::size_t unfinished_tasks_{};
+    std::mutex wait_mutex_;
     std::condition_variable wait_cv_;
-    std::mutex wait_mutex;
+    int active_tasks_{};
 
-    logging::AsyncLogger& logger_;
-
-    void JoinWorkers() {
-        for (std::size_t i = 0, ie = workers_.size(); i != ie; ++i) {
-            if (workers_[i].joinable()) {
-                workers_[i].join();
-                SafePost(logging::WorkerJoined{static_cast<int>(i + 1)});
-            }
-        }
-    }
-
-    void WorkerLoop(int worker_id) {
-        while (auto task_opt = tasks_.WaitAndPop()) {
-            auto task = std::move(task_opt.value());
-
-            SafePost(logging::TaskStarted{
-                worker_id,
-                task.name,
-                std::chrono::system_clock::now()
-            });
-
-            try {
-                task();
-
-                SafePost(logging::TaskFinished{
-                    worker_id,
-                    task.name,
-                    std::chrono::system_clock::now()
-                });
-
-                stats_.TaskDone(worker_id - 1);
-                stats_.AddPayload(worker_id - 1, task.payload);
-            } catch (...) {
-                // suppress exceptions
-            }
-
-            {
-                std::lock_guard<std::mutex> lock(wait_mutex);
-                --unfinished_tasks_;
-            }
+    void NotifyTaskFinished() {
+        std::lock_guard<std::mutex> lock(wait_mutex_);
+        if (--active_tasks_ == 0) {
             wait_cv_.notify_all();
-        }
-    }
-
-    template <typename Event>
-    void SafePost(Event&& event) noexcept {
-        try {
-            logger_.Post(std::forward<Event>(event));
-        } catch (...) {
-            // suppress exceptions
         }
     }
 };
