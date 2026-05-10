@@ -18,6 +18,7 @@ target_include_directories(pool
         src/task_queue
         src/thread_pool
         src/logging
+        src/stats
 )
 
 target_compile_options(pool PRIVATE -Wno-interference-size)
