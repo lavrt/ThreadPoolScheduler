@@ -28,7 +28,10 @@ public:
                 "task_" + std::to_string(i + 1),
                 payload,
                 delay,
-                std::chrono::steady_clock::now() + std::chrono::seconds(delay)};
+                [payload] {
+                    std::this_thread::sleep_for(std::chrono::seconds(payload));
+                }
+            };
 
             tasks.push_back(std::move(task));
         }
