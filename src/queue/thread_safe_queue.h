@@ -92,4 +92,4 @@ private:
     bool stopped_{false};
 };
 
-} // namespace tps::task_queue
+} // namespace tps::queue
