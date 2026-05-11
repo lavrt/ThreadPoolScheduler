@@ -7,7 +7,7 @@
 #include <chrono>
 #include <optional>
 
-namespace tps::task_queue {
+namespace tps::queue {
 
 template <typename T,
           typename = std::enable_if_t<std::is_move_constructible_v<T>>>

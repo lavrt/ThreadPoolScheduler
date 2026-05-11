@@ -10,7 +10,7 @@
 #include <functional>
 #include <new>
 
-#include "task_queue.h"
+#include "thread_safe_queue.h"
 #include "logger.h"
 
 namespace tps::thread_pool {
@@ -101,7 +101,7 @@ public:
 
 private:
     std::vector<std::thread> threads_;
-    task_queue::ThreadSafeQueue<std::function<void()>> tasks_;
+    queue::ThreadSafeQueue<std::function<void()>> tasks_;
 
     std::vector<WorkerStats> stats_;
 
