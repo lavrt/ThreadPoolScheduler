@@ -49,7 +49,7 @@ public:
     }
 
     ~ThreadPool() {
-        tasks_.Close();
+        tasks_.Stop();
 
         for (auto&& thread : threads_) {
             if (thread.joinable()) {
@@ -83,7 +83,7 @@ public:
     }
 
     void Shutdown(JoinCallback on_join = nullptr) {
-        tasks_.Close();
+        tasks_.Stop();
 
         for (std::size_t i = 0, ie = threads_.size(); i != ie; ++i) {
             if (threads_[i].joinable()) {
@@ -95,7 +95,7 @@ public:
         }
     }
 
-    const std::vector<WorkerStats>& GetStats() const {
+    const std::vector<WorkerStats>& GetStats() const noexcept {
         return stats_;
     }
 

@@ -28,7 +28,7 @@ public:
     void Push(T value) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            if (closed_) {
+            if (stopped_) {
                 return;
             }
             queue_.push(std::move(value));
@@ -40,10 +40,10 @@ public:
         std::unique_lock<std::mutex> lock(mutex_);
 
         cv_.wait(lock, [this] {
-            return !queue_.empty() || closed_;
+            return !queue_.empty() || stopped_;
         });
 
-        if (queue_.empty() && closed_) {
+        if (queue_.empty() && stopped_) {
             return std::nullopt;
         }
 
@@ -66,10 +66,10 @@ public:
         return value;
     }
 
-    void Close() {
+    void Stop() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            closed_ = true;
+            stopped_ = true;
         }
         cv_.notify_all();
     }
@@ -89,7 +89,7 @@ private:
 
     mutable std::mutex mutex_;
     std::condition_variable cv_;
-    bool closed_{false};
+    bool stopped_{false};
 };
 
 } // namespace tps::task_queue

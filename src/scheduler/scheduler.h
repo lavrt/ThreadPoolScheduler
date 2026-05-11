@@ -36,16 +36,16 @@ public:
     template <typename Function>
     void AddTask(Clock::time_point ready_at, Function&& f) {
         {
-            std::lock_guard<std::mutex> lock(mtx_tq_);
+            std::lock_guard<std::mutex> lock(mutex_);
             task_queue_.push(DelayedTask{ready_at, std::forward<Function>(f)});
         }
-        cv_tq_.notify_all();
+        cv_.notify_all();
     }
 
     void Wait() {
         {
-            std::unique_lock<std::mutex> lock(mtx_tq_);
-            cv_tq_.wait(lock, [this] {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this] {
                 return task_queue_.empty();
             });
         }
@@ -53,10 +53,10 @@ public:
 
     void Stop() {
         {
-            std::lock_guard<std::mutex> lock(mtx_tq_);
+            std::lock_guard<std::mutex> lock(mutex_);
             stopped_ = true;
         }
-        cv_tq_.notify_all();
+        cv_.notify_all();
     }
 
 private:
@@ -79,15 +79,15 @@ private:
         std::greater<DelayedTask>
     > task_queue_;
 
-    std::mutex mtx_tq_;
-    std::condition_variable cv_tq_;
+    std::mutex mutex_;
+    std::condition_variable cv_;
     bool stopped_{false};
 
     void MonitorThreadLoop() {
-        std::unique_lock<std::mutex> lock(mtx_tq_);
+        std::unique_lock<std::mutex> lock(mutex_);
         
         for (;;) {
-            cv_tq_.wait(lock, [this] {
+            cv_.wait(lock, [this] {
                 return !task_queue_.empty() || stopped_;
             });
 
@@ -105,12 +105,12 @@ private:
                 pool_.Enqueue(std::move(active_task.task));
                 lock.lock();
 
-                cv_tq_.notify_all();
+                cv_.notify_all();
 
                 continue;
             }
 
-            cv_tq_.wait_until(lock, ready_at);
+            cv_.wait_until(lock, ready_at);
         }
     }
 };
