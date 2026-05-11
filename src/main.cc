@@ -25,23 +25,25 @@ int main(int argc, const char* argv[]) {
 
         for (auto&& task : tasks) {
             logger.Post(logging::TaskInfo{task.name, task.payload, task.delay});
-            scheduler.AddTask(task.ready_at, [task, &logger]() mutable {
-                auto id = thread_pool::ThreadPool::worker_id;
+            scheduler.AddTask(task.ready_at,
+                [task = std::move(task), &logger]() mutable {
+                    auto id = thread_pool::ThreadPool::worker_id;
 
-                logger.Post(logging::TaskStarted{
-                    id,
-                    task.name,
-                    std::chrono::system_clock::now()
-                });
+                    logger.Post(logging::TaskStarted{
+                        id,
+                        task.name,
+                        logging::Clock::now()
+                    });
 
-                task();
+                    task();
 
-                logger.Post(logging::TaskFinished{
-                    id,
-                    task.name,
-                    std::chrono::system_clock::now()
-                });
-            });
+                    logger.Post(logging::TaskFinished{
+                        id,
+                        task.name,
+                        logging::Clock::now()
+                    });
+                }
+            );
         }
 
         scheduler.Wait();
@@ -49,8 +51,10 @@ int main(int argc, const char* argv[]) {
 
         logger.Post(logging::AllTasksFinished{});
 
-        // logger.Post(logging::JoiningWorkers{});
-        // pool.Shutdown();
+        logger.Post(logging::JoiningWorkers{});
+        pool.Shutdown([&logger](int id) {
+            logger.Post(logging::WorkerJoined{id});
+        });
 
         logger.Post(logging::StatisticsHeader{});
         auto stats = pool.GetStats();
@@ -61,7 +65,6 @@ int main(int argc, const char* argv[]) {
                 stats[i].total_payload
             });
         }
-
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
     }
