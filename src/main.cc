@@ -1,6 +1,4 @@
 #include <iostream>
-#include <thread>
-#include <chrono>
 
 #include "cl_parser.h"
 #include "task_generator.h"
