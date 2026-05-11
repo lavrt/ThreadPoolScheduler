@@ -40,9 +40,7 @@ target_include_directories(core
 )
 
 target_compile_options(core INTERFACE
-    $<$<OR:$<CXX_COMPILER_ID:GNU>,
-           $<CXX_COMPILER_ID:Clang>
-    >:-Wno-interference-size>
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-interference-size>
 )
 
 # pool --------------------------------------------
