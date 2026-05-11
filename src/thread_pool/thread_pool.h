@@ -13,7 +13,13 @@
 
 namespace tps::thread_pool {
 
-struct alignas(std::hardware_destructive_interference_size) WorkerStats {
+#ifdef __cpp_lib_hardware_interference_size
+    using std::hardware_destructive_interference_size;
+#else
+    constexpr inline std::size_t hardware_destructive_interference_size = 64;
+#endif
+
+struct alignas(hardware_destructive_interference_size) WorkerStats {
     int id{};
     int tasks_done{};
     int total_payload{};
