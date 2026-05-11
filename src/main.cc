@@ -14,15 +14,18 @@ int main(int argc, const char* argv[]) {
 
         logging::AsyncLogger logger{std::cout};
 
+        auto tasks = task_generator::TaskGenerator{}.Generate(cfg.task_count);
+        logger.Post(logging::TasksGenerated{cfg.task_count});
+        for (auto&& task : tasks) {
+            logger.Post(logging::TaskInfo{task.name, task.payload, task.delay});
+        }
+
         thread_pool::ThreadPool pool{cfg.thread_count};
+        logger.Post(logging::ThreadsStarted{cfg.thread_count});
 
         scheduler::Scheduler scheduler{pool};
 
-        auto tasks = task_generator::TaskGenerator{}.Generate(cfg.task_count);
-        logger.Post(logging::TasksGenerated{cfg.task_count});
-
         for (auto&& task : tasks) {
-            logger.Post(logging::TaskInfo{task.name, task.payload, task.delay});
             scheduler.AddTask(task.ready_at,
                 [task = std::move(task), &logger]() mutable {
                     auto id = thread_pool::ThreadPool::worker_id;
