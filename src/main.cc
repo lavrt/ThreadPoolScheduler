@@ -7,7 +7,6 @@
 #include "thread_pool.h"
 #include "logger.h"
 #include "scheduler.h"
-#include "stats.h"
 
 using namespace tps;
 
@@ -15,11 +14,11 @@ int main(int argc, const char* argv[]) {
     try {
         auto cfg = cl_parser::ParseCl(argc, argv);
 
-        logging::AsyncLogger logger(std::cout);
+        logging::AsyncLogger logger{std::cout};
 
-        thread_pool::ThreadPool pool(cfg.thread_count);
+        thread_pool::ThreadPool pool{cfg.thread_count};
 
-        scheduler::Scheduler scheduler(pool);
+        scheduler::Scheduler scheduler{pool};
 
         auto tasks = task_generator::TaskGenerator{}.Generate(cfg.task_count);
         logger.Post(logging::TasksGenerated{cfg.task_count});
@@ -28,7 +27,6 @@ int main(int argc, const char* argv[]) {
             logger.Post(logging::TaskInfo{task.name, task.payload, task.delay});
             scheduler.AddTask(task.ready_at, [task, &logger]() mutable {
                 auto id = thread_pool::ThreadPool::worker_id;
-                auto& ctx = thread_pool::ThreadPool::worker_context;
 
                 logger.Post(logging::TaskStarted{
                     id,
@@ -43,9 +41,6 @@ int main(int argc, const char* argv[]) {
                     task.name,
                     std::chrono::system_clock::now()
                 });
-
-                ++ctx.tasks_done;
-                ctx.total_payload += task.payload;
             });
         }
 
