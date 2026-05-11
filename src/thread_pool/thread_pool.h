@@ -23,12 +23,14 @@ struct alignas(std::hardware_destructive_interference_size) WorkerStats {
 
 class ThreadPool {
 public:
+    using JoinCallback = std::function<void(int)>;
+
     static inline thread_local int worker_id;
 
-    ThreadPool(int thread_count) : thread_count_(thread_count), stats_(thread_count) {
-        for (int i = 0, ie = thread_count_; i != ie; ++i) {
-            threads_.emplace_back([this, i] {
-                worker_id = i + 1;
+    ThreadPool(int thread_count) : stats_(thread_count) {
+        for (int i = 0, ie = thread_count; i != ie; ++i) {
+            threads_.emplace_back([this, id = i + 1] {
+                worker_id = id;
                 while (auto task_opt = tasks_.WaitPop()) {
                     auto task_start = std::chrono::steady_clock::now();
 
@@ -36,9 +38,9 @@ public:
 
                     auto task_end = std::chrono::steady_clock::now();
 
-                    stats_[i].total_payload += std::chrono::duration_cast<
+                    stats_[id - 1].total_payload += std::chrono::duration_cast<
                         std::chrono::seconds>(task_end - task_start).count();
-                    stats_[i].tasks_done++;
+                    stats_[id - 1].tasks_done++;
 
                     NotifyTaskFinished();
                 }
@@ -80,12 +82,24 @@ public:
         });
     }
 
+    void Shutdown(JoinCallback on_join = nullptr) {
+        tasks_.Close();
+
+        for (std::size_t i = 0, ie = threads_.size(); i != ie; ++i) {
+            if (threads_[i].joinable()) {
+                threads_[i].join();
+                if (on_join) {
+                    on_join(static_cast<int>(i + 1));
+                }
+            }
+        }
+    }
+
     const std::vector<WorkerStats>& GetStats() const {
         return stats_;
     }
 
 private:
-    int thread_count_;
     std::vector<std::thread> threads_;
     task_queue::ThreadSafeQueue<std::function<void()>> tasks_;
 
