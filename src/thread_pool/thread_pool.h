@@ -8,33 +8,39 @@
 #include <condition_variable>
 #include <chrono>
 #include <functional>
+#include <new>
 
 #include "task_queue.h"
 #include "logger.h"
-#include "stats.h"
 
 namespace tps::thread_pool {
 
-struct /* alignas(std::hardware_destructive_interference_size) */ WorkerContext {
+struct alignas(std::hardware_destructive_interference_size) WorkerStats {
     int id{};
     int tasks_done{};
     int total_payload{};
 };
 
 class ThreadPool {
-
 public:
     static inline thread_local int worker_id;
-    static inline thread_local WorkerContext worker_context;
 
     ThreadPool(int thread_count) : thread_count_(thread_count), stats_(thread_count) {
         for (int i = 0, ie = thread_count_; i != ie; ++i) {
             threads_.emplace_back([this, i] {
                 worker_id = i + 1;
                 while (auto task_opt = tasks_.WaitPop()) {
+                    auto task_start = std::chrono::steady_clock::now();
+
                     std::invoke(std::move(task_opt.value()));
+
+                    auto task_end = std::chrono::steady_clock::now();
+
+                    stats_[i].total_payload += std::chrono::duration_cast<
+                        std::chrono::seconds>(task_end - task_start).count();
+                    stats_[i].tasks_done++;
+
                     NotifyTaskFinished();
-                    stats_[i] = worker_context;
                 }
             });
         }
@@ -74,7 +80,7 @@ public:
         });
     }
 
-    const std::vector<WorkerContext>& GetStats() const {
+    const std::vector<WorkerStats>& GetStats() const {
         return stats_;
     }
 
@@ -83,7 +89,7 @@ private:
     std::vector<std::thread> threads_;
     task_queue::ThreadSafeQueue<std::function<void()>> tasks_;
 
-    std::vector<WorkerContext> stats_;
+    std::vector<WorkerStats> stats_;
 
     std::mutex wait_mutex_;
     std::condition_variable wait_cv_;
