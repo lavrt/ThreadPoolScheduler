@@ -13,6 +13,8 @@ namespace tps::scheduler {
 
 class Scheduler {
 public:
+    using Clock = std::chrono::steady_clock;
+
     Scheduler(thread_pool::ThreadPool& pool)
         : pool_(pool), monitor_thread_(&Scheduler::MonitorThreadLoop, this) {}
 
@@ -32,7 +34,7 @@ public:
     Scheduler& operator=(Scheduler&&) = delete;
 
     template <typename Function>
-    void AddTask(std::chrono::steady_clock::time_point ready_at, Function&& f) {
+    void AddTask(Clock::time_point ready_at, Function&& f) {
         {
             std::lock_guard<std::mutex> lock(mtx_tq_);
             task_queue_.push(DelayedTask{ready_at, std::forward<Function>(f)});
@@ -59,7 +61,7 @@ public:
 
 private:
     struct DelayedTask {
-        std::chrono::steady_clock::time_point activation_time;
+        Clock::time_point activation_time;
         std::function<void()> task;
 
         bool operator>(const DelayedTask& other) const {
@@ -95,7 +97,7 @@ private:
 
             const auto ready_at = task_queue_.top().activation_time;
 
-            if (ready_at <= std::chrono::steady_clock::now()) {
+            if (ready_at <= Clock::now()) {
                 auto active_task = std::move(task_queue_.top());
                 task_queue_.pop();
                 
