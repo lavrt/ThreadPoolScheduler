@@ -39,6 +39,12 @@ target_include_directories(core
         ${CMAKE_CURRENT_SOURCE_DIR}/src/scheduler
 )
 
+target_compile_options(core INTERFACE
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,
+           $<CXX_COMPILER_ID:Clang>
+    >:-Wno-interference-size>
+)
+
 # pool --------------------------------------------
 
 add_executable(pool
@@ -51,7 +57,3 @@ target_link_libraries(pool
         logging
         core
 )
-
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(pool PRIVATE -Wno-interference-size)
-endif()
