@@ -3,7 +3,6 @@
 #include <thread>
 #include <vector>
 #include <utility>
-#include <atomic>
 #include <mutex>
 #include <condition_variable>
 #include <chrono>
@@ -11,7 +10,6 @@
 #include <new>
 
 #include "thread_safe_queue.h"
-#include "logger.h"
 
 namespace tps::thread_pool {
 
@@ -25,7 +23,7 @@ class ThreadPool {
 public:
     using JoinCallback = std::function<void(int)>;
 
-    static inline thread_local int worker_id;
+    static inline thread_local int worker_id{};
 
     ThreadPool(int thread_count) : stats_(thread_count) {
         for (int i = 0, ie = thread_count; i != ie; ++i) {
