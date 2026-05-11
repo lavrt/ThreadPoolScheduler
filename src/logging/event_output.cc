@@ -10,8 +10,8 @@ namespace tps::logging {
 
 namespace {
 
-std::string FormatTime(std::chrono::system_clock::time_point time) {
-    auto t = std::chrono::system_clock::to_time_t(time);
+std::string FormatTime(Clock::time_point time) {
+    auto t = Clock::to_time_t(time);
     auto tm = *std::localtime(&t);
 
     std::ostringstream oss;

@@ -6,6 +6,8 @@
 
 namespace tps::logging {
 
+using Clock = std::chrono::system_clock;
+
 struct TasksGenerated {
     int task_count{};
 };
@@ -23,13 +25,13 @@ struct ThreadsStarted {
 struct TaskStarted {
     int worker_id{};
     std::string task_name;
-    std::chrono::system_clock::time_point timestamp;
+    Clock::time_point timestamp;
 };
 
 struct TaskFinished {
     int worker_id{};
     std::string task_name;
-    std::chrono::system_clock::time_point timestamp;
+    Clock::time_point timestamp;
 };
 
 struct AllTasksFinished {};
