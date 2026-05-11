@@ -98,7 +98,7 @@ private:
             const auto ready_at = task_queue_.top().activation_time;
 
             if (ready_at <= Clock::now()) {
-                auto active_task = std::move(task_queue_.top());
+                auto active_task = task_queue_.top();
                 task_queue_.pop();
                 
                 lock.unlock();
