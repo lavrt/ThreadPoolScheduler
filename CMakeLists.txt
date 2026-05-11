@@ -18,7 +18,6 @@ target_include_directories(pool
         src/task_queue
         src/thread_pool
         src/logging
-        src/stats
         src/scheduler
 )
 
