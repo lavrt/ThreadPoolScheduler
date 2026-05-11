@@ -10,12 +10,11 @@ namespace tps::logging {
 
 namespace {
 
-std::string FormatTime(Clock::time_point time) {
-    auto t = Clock::to_time_t(time);
-    auto tm = *std::localtime(&t);
+std::string FormatTime(Clock::time_point timestamp) {
+    auto time = Clock::to_time_t(timestamp);
 
     std::ostringstream oss;
-    oss << std::put_time(&tm, "%H:%M:%S");
+    oss << std::put_time(std::localtime(&time), "%H:%M:%S");
 
     return oss.str();
 }
