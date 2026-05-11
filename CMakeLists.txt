@@ -15,10 +15,12 @@ target_include_directories(pool
         src/cl_parser
         src/task_generator
         src/task
-        src/task_queue
+        src/queue
         src/thread_pool
         src/logging
         src/scheduler
 )
 
-target_compile_options(pool PRIVATE -Wno-interference-size)
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(pool PRIVATE -Wno-interference-size)
+endif()
