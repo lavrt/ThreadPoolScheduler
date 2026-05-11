@@ -15,7 +15,7 @@ ProgramConfig ParseCl(int argc, const char* argv[]) {
     try {
         config = {std::stoi(argv[1]), std::stoi(argv[2])};
     } catch (const std::exception& e) {
-        throw std::runtime_error("Invalid arguments");
+        throw std::runtime_error("Invalid arguments: " + std::string{e.what()});
     }
 
     if (config.thread_count <= 0 || config.task_count <= 0) {
