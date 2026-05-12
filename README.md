@@ -54,13 +54,13 @@ cmake --build build
 ## Usage
 
 ```bash
-./pool <threads_count> <tasks_count>
+./build/pool <threads_count> <tasks_count>
 ```
 
 Example:
 
 ```bash
-./pool 2 4
+./build/pool 2 4
 ```
 
 ## Example Output
