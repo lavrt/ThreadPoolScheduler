@@ -40,13 +40,12 @@ public:
                 while (auto task_opt = tasks_.WaitPop()) {
                     auto task_start = std::chrono::steady_clock::now();
 
-                    std::invoke(std::move(task_opt.value()));
+                    try {
+                        std::invoke(std::move(task_opt.value()));
 
-                    auto task_end = std::chrono::steady_clock::now();
-
-                    stats_[id - 1].total_payload += std::chrono::duration_cast<
-                        std::chrono::seconds>(task_end - task_start).count();
-                    stats_[id - 1].tasks_done++;
+                        auto task_end = std::chrono::steady_clock::now();
+                        UpdateStats(id, task_end - task_start);
+                    } catch (...) {}
 
                     NotifyTaskFinished();
                 }
@@ -83,6 +82,11 @@ public:
     bool Enqueue(Function&& f) {
         {
             std::lock_guard<std::mutex> lock(wait_mutex_);
+
+            if (stopped_) {
+                return false;
+            }
+            
             ++active_tasks_;
         }
 
@@ -102,13 +106,19 @@ public:
     }
 
     void Shutdown(JoinCallback on_join = nullptr) {
+        {
+            std::lock_guard<std::mutex> lock(wait_mutex_);
+            stopped_ = true;
+        }
+
         tasks_.Stop();
 
         for (std::size_t i = 0, ie = threads_.size(); i != ie; ++i) {
             if (threads_[i].joinable()) {
                 threads_[i].join();
                 if (on_join) {
-                    on_join(static_cast<int>(i + 1));
+                    int thread_id = static_cast<int>(i + 1);
+                    on_join(thread_id);
                 }
             }
         }
@@ -128,11 +138,19 @@ private:
     std::condition_variable wait_cv_;
     int active_tasks_{};
 
+    bool stopped_{false};
+
     void NotifyTaskFinished() {
         std::lock_guard<std::mutex> lock(wait_mutex_);
         if (--active_tasks_ == 0) {
             wait_cv_.notify_all();
         }
+    }
+
+    void UpdateStats(int id, std::chrono::steady_clock::duration duration) {
+        stats_[id - 1].total_payload +=
+            std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        stats_[id - 1].tasks_done++;
     }
 };
 
