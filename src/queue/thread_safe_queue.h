@@ -28,15 +28,16 @@ public:
 
     ThreadSafeQueue& operator=(ThreadSafeQueue&&) = delete;
 
-    void Push(T value) {
+    bool Push(T value) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
             if (stopped_) {
-                return;
+                return false;
             }
             queue_.push(std::move(value));
         }
         cv_.notify_one();
+        return true;
     }
 
     std::optional<T> WaitPop() {
