@@ -59,11 +59,11 @@ int main(int argc, const char* argv[]) {
 
         logger.Post(logging::StatisticsHeader{});
         auto stats = pool.GetStats();
-        for (std::size_t i = 0, ie = cfg.thread_count; i != ie; ++i) {
+        for (auto&& worker_stat : stats) {
             logger.Post(logging::WorkerStatistics{
-                stats[i].id,
-                stats[i].tasks_done,
-                stats[i].total_payload
+                worker_stat.id,
+                worker_stat.tasks_done,
+                worker_stat.total_payload
             });
         }
     } catch (const std::exception& e) {
