@@ -10,8 +10,10 @@
 
 namespace tps::queue {
 
-template <typename T,
-          typename = std::enable_if_t<std::is_move_constructible_v<T>>>
+template <
+    typename T,
+    std::enable_if_t<std::is_move_constructible_v<T>, int> = 0
+>
 class ThreadSafeQueue {
 public:
     ThreadSafeQueue() = default;

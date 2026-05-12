@@ -71,7 +71,14 @@ public:
 
     ThreadPool& operator=(ThreadPool&&) = delete;
 
-    template <typename Function>
+    template <
+        typename Function,
+        std::enable_if_t<
+            std::is_invocable_r_v<void, std::decay_t<Function>&> &&
+            std::is_constructible_v<std::function<void()>, Function&&>,
+            int
+        > = 0
+    >
     void Enqueue(Function&& f) {
         {
             std::lock_guard<std::mutex> lock(wait_mutex_);
