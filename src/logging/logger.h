@@ -31,13 +31,19 @@ public:
         }
     }
 
-    void Post(Event event) {
+    bool Post(Event event) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
+
+            if (stopped_) {
+                return false;
+            }
+
             events_.push(std::move(event));
         }
         
         cv_.notify_one();
+        return true;
     }
 
 private:
