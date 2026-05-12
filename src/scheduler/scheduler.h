@@ -31,19 +31,24 @@ public:
     Scheduler& operator=(Scheduler&&) = delete;
 
     template <typename Function>
-    void AddTask(Clock::time_point ready_at, Function&& f) {
+    bool AddTask(Clock::time_point ready_at, Function&& f) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
+            if (stopped_) {
+                return false;
+            }
             task_queue_.push(DelayedTask{ready_at, std::forward<Function>(f)});
         }
+
         cv_.notify_all();
+        return true;
     }
 
     void Wait() {
         {
             std::unique_lock<std::mutex> lock(mutex_);
             cv_.wait(lock, [this] {
-                return task_queue_.empty();
+                return stopped_ || task_queue_.empty();
             });
         }
     }
@@ -51,11 +56,14 @@ public:
     void Stop() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
+
             if (stopped_) {
                 return;
             }
+            
             stopped_ = true;
         }
+        
         cv_.notify_all();
 
         if (monitor_thread_.joinable()) {
