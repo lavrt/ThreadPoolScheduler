@@ -20,9 +20,6 @@ public:
 
     ~Scheduler() {
         Stop();
-        if (monitor_thread_.joinable()) {
-            monitor_thread_.join();
-        }
     }
 
     Scheduler(const Scheduler&) = delete;
@@ -54,9 +51,16 @@ public:
     void Stop() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
+            if (stopped_) {
+                return;
+            }
             stopped_ = true;
         }
         cv_.notify_all();
+
+        if (monitor_thread_.joinable()) {
+            monitor_thread_.join();
+        }
     }
 
 private:
@@ -91,26 +95,30 @@ private:
                 return !task_queue_.empty() || stopped_;
             });
 
-            if (task_queue_.empty() && stopped_) {
+            if (stopped_) {
                 return;
             }
 
             const auto ready_at = task_queue_.top().activation_time;
 
-            if (ready_at <= Clock::now()) {
-                auto active_task = task_queue_.top();
-                task_queue_.pop();
-                
-                lock.unlock();
-                pool_.Enqueue(std::move(active_task.task));
-                lock.lock();
-
-                cv_.notify_all();
+            if (Clock::now() < ready_at) {
+                cv_.wait_until(lock, ready_at, [this, ready_at] {
+                    return stopped_ ||
+                           task_queue_.empty() ||
+                           task_queue_.top().activation_time < ready_at;
+                });
 
                 continue;
             }
 
-            cv_.wait_until(lock, ready_at);
+            auto active_task = task_queue_.top();
+            task_queue_.pop();
+            
+            cv_.notify_all();
+
+            lock.unlock();
+            pool_.Enqueue(std::move(active_task.task));
+            lock.lock();
         }
     }
 };
