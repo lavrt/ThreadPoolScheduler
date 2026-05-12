@@ -8,6 +8,7 @@
 #include <chrono>
 #include <functional>
 #include <new>
+#include <type_traits>
 
 #include "thread_safe_queue.h"
 
@@ -79,12 +80,18 @@ public:
             int
         > = 0
     >
-    void Enqueue(Function&& f) {
+    bool Enqueue(Function&& f) {
         {
             std::lock_guard<std::mutex> lock(wait_mutex_);
             ++active_tasks_;
         }
-        tasks_.Push(std::forward<Function>(f));
+
+        if (tasks_.Push(std::forward<Function>(f))) {
+            return true;
+        }
+
+        NotifyTaskFinished();
+        return false;
     }
 
     void Wait() {
