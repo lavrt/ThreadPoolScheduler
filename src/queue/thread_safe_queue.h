@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <chrono>
 #include <optional>
+#include <type_traits>
 
 namespace tps::queue {
 
