@@ -35,6 +35,7 @@ public:
         for (int i = 0, ie = thread_count; i != ie; ++i) {
             threads_.emplace_back([this, id = i + 1] {
                 worker_id = id;
+                stats_[id - 1].id = id;
                 while (auto task_opt = tasks_.WaitPop()) {
                     auto task_start = std::chrono::steady_clock::now();
 

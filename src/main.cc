@@ -61,7 +61,7 @@ int main(int argc, const char* argv[]) {
         auto stats = pool.GetStats();
         for (std::size_t i = 0, ie = cfg.thread_count; i != ie; ++i) {
             logger.Post(logging::WorkerStatistics{
-                static_cast<int>(i + 1),
+                stats[i].id,
                 stats[i].tasks_done,
                 stats[i].total_payload
             });
