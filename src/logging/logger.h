@@ -15,8 +15,9 @@ namespace tps::logging {
 
 class AsyncLogger {
 public:
-    AsyncLogger(std::ostream& os)
-        : os_(os), log_thread_(&AsyncLogger::ProcessLogs, this) {}
+    AsyncLogger(std::ostream& os) : os_(os) {
+        log_thread_ = std::thread{&AsyncLogger::ProcessLogs, this};
+    }
 
     ~AsyncLogger() {
         {
@@ -49,12 +50,13 @@ public:
 private:
     std::ostream& os_;
 
-    std::thread log_thread_;
     std::queue<Event> events_;
 
     std::mutex mutex_;
     std::condition_variable cv_;
     bool stopped_{false};
+
+    std::thread log_thread_;
 
     void ProcessLogs() {
         std::unique_lock<std::mutex> lock(mutex_);

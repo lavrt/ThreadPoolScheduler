@@ -15,8 +15,9 @@ class Scheduler {
 public:
     using Clock = std::chrono::steady_clock;
 
-    Scheduler(thread_pool::ThreadPool& pool)
-        : pool_(pool), monitor_thread_(&Scheduler::MonitorThreadLoop, this) {}
+    Scheduler(thread_pool::ThreadPool& pool) : pool_(pool) {
+        monitor_thread_ = std::thread{&Scheduler::MonitorThreadLoop, this};
+    }
 
     ~Scheduler() {
         Stop();
@@ -85,8 +86,6 @@ private:
 
     thread_pool::ThreadPool& pool_;
 
-    std::thread monitor_thread_;
-
     std::priority_queue<
         DelayedTask,
         std::vector<DelayedTask>,
@@ -97,6 +96,8 @@ private:
     std::condition_variable cv_;
     bool stopped_{false};
 
+    std::thread monitor_thread_;
+
     void MonitorThreadLoop() {
         std::unique_lock<std::mutex> lock(mutex_);
         
@@ -104,7 +105,7 @@ private:
             cv_.wait(lock, [this] {
                 return !task_queue_.empty() || stopped_;
             });
-
+            
             if (stopped_) {
                 return;
             }
@@ -123,9 +124,9 @@ private:
 
             auto active_task = task_queue_.top();
             task_queue_.pop();
-
+            
             pool_.Enqueue(std::move(active_task.task));
-
+            
             cv_.notify_all();
         }
     }
