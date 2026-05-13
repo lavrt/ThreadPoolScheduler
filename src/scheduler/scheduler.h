@@ -34,9 +34,11 @@ public:
     bool AddTask(Clock::time_point ready_at, Function&& f) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
+
             if (stopped_) {
                 return false;
             }
+            
             task_queue_.push(DelayedTask{ready_at, std::forward<Function>(f)});
         }
 
@@ -121,12 +123,10 @@ private:
 
             auto active_task = task_queue_.top();
             task_queue_.pop();
-            
-            cv_.notify_all();
 
-            lock.unlock();
             pool_.Enqueue(std::move(active_task.task));
-            lock.lock();
+
+            cv_.notify_all();
         }
     }
 };
