@@ -2,6 +2,8 @@
 
 A multithreaded task processing system written in C++17. The project simulates asynchronous task execution using a thread pool, delayed task scheduling, and an asynchronous event-driven Logger.
 
+---
+
 ## Introduction
 
 The goal of this project is to develop a multithreaded system in C++17 that accepts a stream of incoming "tasks", processes them in parallel using a thread pool, and can gracefully shut down upon receiving a stop signal.
@@ -25,6 +27,8 @@ The system collects statistics for each worker, including the number of tasks ex
 Upon a stop signal, the system should stop accepting new delayed tasks.
 Tasks already in the thread pool continue execution until completion.
 
+---
+
 ## Project Architecture
 
 The system consists of several independent components:
@@ -36,6 +40,8 @@ The system consists of several independent components:
 | `ThreadSafeQueue` | A generic blocking queue used for communication between threads. It provides safe task/event passing without data races. |
 | `Logger` | Runs in a dedicated thread and prints task execution events asynchronously. |
 | `TaskGenerator` | Generates random tasks. Each task has a name, execution time (`payload`), and startup delay (`delay`). |
+
+---
 
 ## Usage Examples
 
@@ -239,6 +245,8 @@ int main() {
 
 `AsyncLogger` flushes all queued events in its destructor before the logging thread exits.
 
+---
+
 ## Build and Run
 
 ### Requirements
@@ -279,13 +287,15 @@ Example:
 | `threads_count` | Number of worker threads in the thread pool. Must be greater than 0. |
 | `tasks_count` | Number of tasks to generate and process. Must be greater than 0. |
 
-## Testing
+### Testing
 
 Run unit tests with CTest:
 
 ```bash
 ctest -V --test-dir build
 ```
+
+---
 
 ## Example Output
 
