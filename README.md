@@ -157,13 +157,13 @@ int main() {
     auto now = tps::scheduler::Scheduler::Clock::now();
 
     scheduler.AddTask(now + 10s, [] {
-        std::cout << "this task will probably not run\n";
+        // this task will probably not run
     });
 
     scheduler.Stop();
 
     bool accepted = scheduler.AddTask(now + 1s, [] {
-        std::cout << "this task will not be accepted\n";
+        // this task will not be accepted
     });
 
     if (!accepted) {
