@@ -55,3 +55,9 @@ target_link_libraries(pool
         logging
         core
 )
+
+# tests -------------------------------------------
+
+enable_testing()
+
+add_subdirectory(tests)
